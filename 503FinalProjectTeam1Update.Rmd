@@ -1,5 +1,5 @@
 ---
-title: "ADS 503 Final Project"
+title: "ADS 503 Final Project_test"
 author: 'Group1: Sean Torres, George Garcia, and Anusia Edward'
 output:
   pdf_document: default
@@ -17,38 +17,52 @@ library(VIM)
 
 ```{r, message=FALSE}
 air <- read.csv("~/Desktop/Shunyi.csv")
-```
-
-```{r, message=FALSE}
-sum(is.na(air)) # checking for NAs 
-
-air.knn <- kNN(air) # using 5KNN to impute missing values 
-# removing the imputation truth variables that were added 
-air.knn <- subset(air.knn, select = year:station)
-sum(is.na(air.knn)) # double checking NAs 
-```
-
-```{r, message=FALSE}
-# splitting predictors and outcome variables 
-x <- subset(air.knn, select = -c(PM2.5))
-y <- subset(air.knn, select = PM2.5)
-library(caret)
-nZV.x <- nearZeroVar(x)# checking near zero variance 
-x <- x[, -nZV.x]# removal of nZV 
-# splitting the data before preprocessing to avoid data leakage
-library(caret) 
+sum(is.na(air$PM2.5)) 
+# won't let me split because of the NAs in the outcome var 
+# filling outcome var 
+air.o <- kNN(air, variable = c("PM2.5"))
+air.o <- subset(air.o, select = year:WSPM)
+x <- subset(air.o, select = -PM2.5)
+y <- subset(air.o, select = PM2.5)
+# splitting dataset to ensure no further data leakage 
 set.seed(1)
-trainset <- createDataPartition(air.knn$PM2.5, p = 0.8, list = FALSE)
+trainset <- createDataPartition(air.o$PM2.5, p = 0.8, list = FALSE)
 x.train <- x[trainset, ]
 y.train <- y[trainset, ]
-y.train1 <- as.data.frame(y.train)
 x.test <- x[-trainset, ]
 y.test <- y[-trainset, ]
+y.train1 <- as.data.frame(y.train)
 y.test1 <- as.data.frame(y.test)
-```
-
-```{r, message=FALSE}
-# checking distributions
+#imputing missing values using KNN
+sum(is.na(x.train))
+x.train <- kNN(x.train)
+x.train <- subset(x.train, select = year:WSPM)
+sum(is.na(x.test))
+x.test <- kNN(x.test)
+x.test <- subset(x.test, select = year:WSPM)
+sum(is.na(y.train))
+sum(is.na(y.test))
+# near Zero Variance removal
+nZV.x <- nearZeroVar(x.train) 
+x.train <- x.train[, -nZV.x]
+x.test <- x.test[, -nZV.x]
+# visualizing at outliers 
+par(mfrow = c(2,3))
+boxplot(x.train$year,xlab = "Year")
+boxplot(x.train$month, xlab = "Month")
+boxplot(x.train$day, xlab = "Day")
+boxplot(x.train$hour, xlab = "Hour")
+boxplot(x.train$PM10, xlab = "PM10")
+boxplot(x.train$SO2, xlab = "SO2")
+par(mfrow = c(2,4))
+boxplot(x.train$NO2, xlab = "NO2")
+boxplot(x.train$CO, xlab = "CO")
+boxplot(x.train$O3, xlab = "O3")
+boxplot(x.train$TEMP, xlab = "Temperature")
+boxplot(x.train$PRES, xlab = "Pressure")
+boxplot(x.train$DEWP, xlab = "Dew point Temp")
+boxplot(x.train$WSPM, xlab = "Wind Speed")
+# visualizing of distributions 
 par(mfrow = c(2,3))
 hist(x.train$year,xlab = "Year")
 hist(x.train$month, xlab = "Month")
@@ -64,10 +78,6 @@ hist(x.train$TEMP, xlab = "Temperature")
 hist(x.train$PRES, xlab = "Pressure")
 hist(x.train$DEWP, xlab = "Dew point Temp")
 hist(x.train$WSPM, xlab = "Wind Speed")
-
-```
-
-```{r, message=FALSE}
 # box-cox, center, scaling 
 trans <- preProcess(x.train, 
                        method = c("BoxCox", "center", "scale"))
@@ -81,102 +91,96 @@ x.testp <- predict(trans2, x.test)
 trans3 <- preProcess(y.test1, 
                        method = c("BoxCox", "center", "scale"))
 y.testp <- predict(trans3, y.test1)
-
 # visualization of the transformations 
 par(mfrow = c(2,2))
 hist(x.train$CO, xlab = "CO")
 hist(x.trainp$CO, xlab = "CO after tranformations")
 hist(x.train$O3, xlab = "O3")
 hist(x.trainp$O3, xlab = "O3 after transformations")
-```
-
-```{r, message=FALSE}
-# checking for correlations 
+# visualizing outliers after transformations 
+par(mfrow = c(2,3))
+boxplot(x.trainp$year,xlab = "Year")
+boxplot(x.trainp$month, xlab = "Month")
+boxplot(x.trainp$day, xlab = "Day")
+boxplot(x.trainp$hour, xlab = "Hour")
+boxplot(x.trainp$PM10, xlab = "PM10")
+boxplot(x.trainp$SO2, xlab = "SO2")
+par(mfrow = c(2,4))
+boxplot(x.trainp$NO2, xlab = "NO2")
+boxplot(x.trainp$CO, xlab = "CO")
+boxplot(x.trainp$O3, xlab = "O3")
+boxplot(x.trainp$TEMP, xlab = "Temperature")
+boxplot(x.trainp$PRES, xlab = "Pressure")
+boxplot(x.trainp$DEWP, xlab = "Dew point Temp")
+boxplot(x.trainp$WSPM, xlab = "Wind Speed")
+# visualizing correlation
 x.corr <- cor(x.trainp)
-library(corrplot)
 corrplot(x.corr, order = "hclust")
-hCorr <- findCorrelation(x.corr, cutoff = 0.75, exact = TRUE)
+hCorr <- findCorrelation(x.corr, cutoff = 0.8, exact = TRUE)
 x.trainpc <- x.trainp[, -hCorr]
 x.testpc <- x.testp[, -hCorr]
 x.corrCheck <- cor(x.trainpc)
 x.corrCheck 
-corrplot(x.corrCheck, order = "hclust")
+#corrplot(x.corrCheck, order = "hclust")
 ```
 
-
-
-
-
 ```{r}
-# pca to determine the effective dimensions of the data 
 pca.x <- prcomp(x.train, center = TRUE, scale. = TRUE)
-summary(pca.x)
-plot(pca.x, type = "l")
-```
-
-```{r}
-
-df = subset(air.knn, select = -c(station) )
-pca <- prcomp(df, scale = TRUE)
-pca
-variance = pca$sdev^2 / sum(pca$sdev^2)
+variance = pca.x$sdev^2 / sum(pca.x$sdev^2)
 #variance
 library(ggplot2)
-qplot(c(1:15), variance) +
+qplot(c(1:13), variance) +
   geom_line() +
   geom_point(size=4)+
   xlab("Principal Component") +
   ylab("Variance Explained") +
   ggtitle("Scree Plot") +
   ylim(0, 1)
+
 ```
-
-
 
 ```{r OLS}
 #Using as a base model that is simple
 set.seed(100)
 indx <- createFolds(y.train, returnTrain = TRUE)
 ctrl <- trainControl(method = "cv", index = indx)
-pcrTune2 <- train(x = x.trainp, y = y.train,
+pcrTune2 <- train(x = x.trainpc, y = y.train,
                  method = "lm",trControl = ctrl)
 pcrTune2  
 summary(pcrTune2)
 #testResults 
 
-# rfImp <- varImp(pcrTune2, scale = FALSE)
-#rfImp
+ rfImp <- varImp(pcrTune2, scale = FALSE)
+rfImp
 
-fp_predict <- predict(pcrTune2, x.testp)
+fp_predict <- predict(pcrTune2, x.testpc)
 
 postResample(fp_predict, y.test)
 #Taking account of RMSE and Rsqr values OLS seems to be the better model.
 # Although it tied with pls ols is the simpler model. 
 ```
 
-
 ```{r}
 # try to reduce features using pls
 set.seed(100)
 indx <- createFolds(y.train, returnTrain = TRUE)
 ctrl <- trainControl(method = "cv", index = indx)
-pcrTune3 <- train(x = x.trainp, y = y.train,
+pcrTune3 <- train(x = x.train, y = y.train,
                  method = "pls",
+                 preProcess=c("center","scale"),
                  tuneGrid = expand.grid(ncomp = 1:14),
                  trControl = ctrl)
 pcrTune3
 summary(pcrTune3) 
 
 
-fp_predict <- predict(pcrTune3, x.testp)
+fp_predict <- predict(pcrTune3, x.test)
 
 postResample(fp_predict, y.test)
 
-#rfImp <- varImp(pcrTune3, scale = FALSE)
-#rfImp
+rfImp <- varImp(pcrTune3, scale = FALSE)
+rfImp
 ```
-
-
 
 ```{r}
 # great for large data decision trees will be having better average accuracy.
@@ -194,19 +198,59 @@ testResults <- data.frame(obs = y.test,
 getRMSE(testResults$obs, testResults$rfmodel)
 
 fp_predict <- predict(rfmodel , x.testp)
-
+fp_predict
 postResample(fp_predict, y.test)
-#rfImp <- varImp(rfmodel, scale = FALSE)
-#rfImp
+rfImp <- varImp(rfmodel, scale = FALSE)
+rfImp
 ```
 
-
-
-
-
-
-
 ```{r}
-resamp <- resamples(list(OLS = pcrTune2, PLS = pcrTune3))
+enetGrid <- expand.grid(lambda = c(0, 0.01, .1), 
+                        fraction = seq(.05, 1, length = 20))
+set.seed(100)
+enetTune <- train(x = x.train, y = y.train,
+                  method = "enet",
+                  tuneGrid = enetGrid,
+                  trControl = ctrl,
+                  preProc = c("center", "scale"))
+enetTune
+
+enet_predict <- predict(enetTune, x.test)
+enet_predict
+
+
+postResample(enet_predict, y.test)
+
+#rfImp <- varImp(enetTune, scale = FALSE)
+#rfImp
+```
+```{r}
+resamp <- resamples(list(OLS = pcrTune2, PLS = pcrTune3,Enet=enetTune))
 summary(resamp)
+
+```
+```{R}
+#library(ranger)
+
+
+
+
+#model_caret <- train(PM10~.,air.o,
+ #                    method = "ranger",
+ #                    splitrule = "gini",
+#                     num.trees = 500,
+#                     importance = "impurity")
+
+
+
+
+#model_caret
+
+
+
+#fp_predict <- predict(model_caretl , x.testp)
+#fp_predict
+#postResample(model_caret, y.test)
+#rfImp <- varImp(model_caret, scale = FALSE)
+#rfImp
 ```
